@@ -16,10 +16,16 @@ class BattleHandler:
         self.start = cv.imread("images/start.png", 0)
         self.postBattle = cv.imread("images/continue.png", 0)
 
+        self.lastUpdate = time.time()
+
         self.debug = debug
 
     def do_battle(self):
         while True:
+            if not self.active:
+                break
+            if time.time() - self.lastUpdate < self.updateFreq:
+                continue
             # Take a screenshot of the entire screen
             screen = pyautogui.screenshot()
             # Convert the screenshot to a numpy array
@@ -84,5 +90,3 @@ class BattleHandler:
 
             else:
                 print(f"Could not find win rate button ({np.max(res)}/{threshold})")
-
-            time.sleep(self.updateFreq)
