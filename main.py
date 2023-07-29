@@ -1,18 +1,22 @@
 from battler import BattleHandler
 import tkinter as tk
 import asyncio
-import cv2 as cv
+
+
+active_task = None
+
 
 def main():
-    win = tk.Tk()
-    win.title("LCGT - Limbus Company Grind Tool")
+    bh = BattleHandler(debug=False)
+    loop = asyncio.get_event_loop()
 
-    bh = BattleHandler(False)
-
-    btn = tk.Button(win, text="Start", command=bh.do_battle)
-    btn.grid(column=0, row=0)
-
-    win.mainloop()
+    while True:
+        print("Starting battle")
+        # Start the battle in a new thread
+        global active_task
+        active_task = loop.create_task(bh.do_battle())
+        loop.run_until_complete(active_task)
+        print("Battle ended")
 
 
 if __name__ == '__main__':

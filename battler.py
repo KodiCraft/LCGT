@@ -21,7 +21,8 @@ class BattleHandler:
 
         self.debug = debug
 
-    def do_battle(self):
+    async def do_battle(self):
+        self.active = True
         while True:
             if not self.active:
                 break
@@ -118,6 +119,11 @@ class BattleHandler:
                 pyautogui.click()
                 # Battle end
                 print("Battle end")
+                self.active = False
                 break
             else:
                 print(f"Could not find continue button ({np.max(res)}/{threshold})")
+
+    async def watch(self):
+        while True:
+            await self.do_battle()
