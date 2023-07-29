@@ -7,14 +7,15 @@ import os
 
 class BattleHandler:
     # Settings for the battlehandler
-    def __init__(self, update_freq, debug: bool = False):
+    def __init__(self, debug: bool = False):
         self.active = True
-        self.updateFreq = update_freq
         self.imgPfx = "images/"
 
         self.abMode = cv.imread("images/winrate.png", 0)
         self.start = cv.imread("images/start.png", 0)
         self.postBattle = cv.imread("images/continue.png", 0)
+
+        self.knownScale = None
 
         self.lastUpdate = time.time()
 
@@ -24,17 +25,17 @@ class BattleHandler:
         while True:
             if not self.active:
                 break
-            if time.time() - self.lastUpdate < self.updateFreq:
-                continue
             # Take a screenshot of the entire screen
             screen = pyautogui.screenshot()
             # Convert the screenshot to a numpy array
             screen = np.array(screen)
             screen = cv.cvtColor(screen, cv.COLOR_RGB2GRAY)
 
-            # Use template matching to find the win rate button
-            # Try with different scales of the button: people will have different resolutions
-            scales = [0.5, 0.75, 1.0, 1.25, 1.5]
+            # If we haven't found the scale yet, find it
+            if self.knownScale is None:
+                scales = [0.5, 1, 1.125, 1.25, 1.5, 2]
+            else:
+                scales = [self.knownScale]
 
             res = None
             found_scale = None
@@ -44,6 +45,7 @@ class BattleHandler:
                 res = cv.matchTemplate(screen, resized, cv.TM_CCOEFF_NORMED)
                 # We only care about the maximum value
                 if np.max(res) > 0.6:
+                    self.knownScale = scale # We've now found the game's scale
                     break
 
             # Resize the image to the scale we found
@@ -90,3 +92,32 @@ class BattleHandler:
 
             else:
                 print(f"Could not find win rate button ({np.max(res)}/{threshold})")
+
+            # Check if we are in the post-battle screen
+            # Look for the 'continue' button
+            res = None
+            found_scale = None
+            scales = [0.5, 1, 1.125, 1.25, 1.5, 2]  # This needs its own scales because our post-battle image is smaller
+            for scale in scales:
+                resized = cv.resize(self.postBattle, (0, 0), fx=scale, fy=scale)
+                found_scale = scale
+                res = cv.matchTemplate(screen, resized, cv.TM_CCOEFF_NORMED)
+                # We only care about the maximum value
+                if np.max(res) > 0.6:
+                    break
+
+            # Resize the image to the scale we found
+            post_battle = cv.resize(self.postBattle, (0, 0), fx=found_scale, fy=found_scale)
+
+            if np.any(res >= threshold):
+                print(f"Found continue button! ({np.max(res)}/{threshold})")
+                loc = np.where(res >= threshold)
+                # Click the button
+                pyautogui.moveTo(loc[1][0] + post_battle.shape[1] / 2, loc[0][0] + post_battle.shape[0] / 2)
+                time.sleep(0.25)
+                pyautogui.click()
+                # Battle end
+                print("Battle end")
+                break
+            else:
+                print(f"Could not find continue button ({np.max(res)}/{threshold})")
