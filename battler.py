@@ -35,36 +35,43 @@ class BattleHandler:
             screen = pyautogui.screenshot()
             # Convert the screenshot to a numpy array
             screen = np.array(screen)
-            screen = cv.cvtColor(screen, cv.COLOR_BGR2RGB)
+            screen = cv.cvtColor(screen, cv.COLOR_RGB2GRAY)
 
             # Load the image of the win rate button
-            ab_mode = cv.imread(self.imgPfx + self.abMode)
+            ab_mode = cv.imread(self.imgPfx + self.abMode, 0)
 
-            # If we can find the win rate button, it's our turn
-            res = cv.matchTemplate(screen, ab_mode, cv.TM_CCOEFF_NORMED)
+            # Use template matching to find the win rate button
+            # Try with different scales of the button: people will have different resolutions
+            scales = [0.5, 0.75, 1.0, 1.25, 1.5]
 
-            threshold = 0.8
+            res = None
+            found_scale = None
+            for scale in scales:
+                resized = cv.resize(ab_mode, (0, 0), fx=scale, fy=scale)
+                found_scale = scale
+                res = cv.matchTemplate(screen, resized, cv.TM_CCOEFF_NORMED)
+                # We only care about the maximum value
+                if np.max(res) > 0.6:
+                    break
+
+            # Resize the image to the scale we found
+            ab_mode = cv.resize(ab_mode, (0, 0), fx=found_scale, fy=found_scale)
+
+            threshold = 0.6
             if np.any(res >= threshold):
-                # Click the win rate button
                 loc = np.where(res >= threshold)
-                print(f"Found ({np.max(res)}/{threshold}), clicking...")
-
+                print(f"Found win rate button! ({np.max(res)}/{threshold})")
                 if self.debug:
-                    self.display_locations(screen, ab_mode, loc)
-
-                # pyautogui.click(loc[1][0] + 10, loc[0][0] + 10)
-
+                    loc = list(zip(*loc[::-1]))
+                    res_screen = screen.copy()
+                    # Make it a color image
+                    res_screen = cv.cvtColor(res_screen, cv.COLOR_GRAY2RGB)
+                    for pt in loc:
+                        cv.rectangle(res_screen, pt, (pt[0] + ab_mode.shape[1], pt[1] + ab_mode.shape[0]), (0, 255, 0), 2)
+                    res_screen = cv.resize(res_screen, (960, 540))
+                    cv.imshow("win rate button", res_screen)
+                    cv.waitKey(1)
             else:
-                # Wait for the next turn
-                print(f"Not found ({np.max(res)}/{threshold}), waiting...")
+                print(f"Could not find win rate button ({np.max(res)}/{threshold})")
 
             time.sleep(self.updateFreq)
-
-    @staticmethod
-    def display_locations(img, template, locs):
-        w, h = template.shape[::-1]
-        for pt in zip(*locs[::-1]):
-            cv.rectangle(img, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
-        cv.imshow('screen', img)
-        cv.waitKey(1)
-        cv.destroyAllWindows()
